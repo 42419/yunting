@@ -54,6 +54,18 @@ jobs:
       - name: 打 release APK (arm64-v8a)
         run: flutter build apk --release --target-platform android-arm64
 
+      - name: 验证 libgma.so 真的被打进了 APK
+        run: |
+          apk="build/app/outputs/flutter-apk/app-release.apk"
+          ls -la "$apk"
+          echo "--- APK 里的 lib/ 目录 ---"
+          unzip -l "$apk" | grep -i "lib/" || true
+          if ! unzip -l "$apk" | grep -q "lib/arm64-v8a/libgma.so"; then
+            echo "::error::libgma.so 没有被打进最终的 APK，内嵌后端启动时会找不到这个文件"
+            exit 1
+          fi
+          echo "确认 libgma.so 已经在 APK 里"
+
       - name: 上传 APK
         uses: actions/upload-artifact@v4
         with:

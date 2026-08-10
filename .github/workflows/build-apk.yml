@@ -4,6 +4,11 @@ name: Build APK
 # Google/Maven 仓库的网络太慢。GitHub Actions 的 runner 在海外，访问这些源
 # 飞快，所以把打包这一步挪到 CI 上做，本地就不用再等了。
 #
+# 内嵌后端(server/ 目录)也是在这里现编的，不是拿仓库里预编译好提交的那份
+# libgma.so——那份只是给本地跑 scripts/build_backend.sh 用的兜底缓存，
+# 容易忘记同步导致 server/ 代码改了但 apk 里跑的还是旧二进制。CI 里用
+# 官方 Go 工具链 + 正常网络重新编译，才是每次实际打进 apk 里的那份。
+#
 # 用法：
 #   - push 到 main 分支会自动触发一次构建
 #   - 也可以在 GitHub 网页的 Actions 页签手动点 "Run workflow" 触发
@@ -23,14 +28,23 @@ jobs:
       - name: 拉取代码
         uses: actions/checkout@v4
 
-      - name: 确认内嵌后端二进制在仓库里
+      - name: 装 Go (版本跟 server/go.mod 声明的一致)
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: server/go.mod
+          cache-dependency-path: server/go.sum
+
+      - name: 交叉编译内嵌后端 (android/arm64)
+        working-directory: server
+        env:
+          CGO_ENABLED: 0
+          GOOS: android
+          GOARCH: arm64
         run: |
-          f="android/app/src/main/jniLibs/arm64-v8a/libgma.so"
-          if [ ! -s "$f" ]; then
-            echo "::error::找不到 $f，内嵌后端二进制没提交或者路径不对，打出来的 APK 会启动不了后端"
-            exit 1
-          fi
-          ls -la "$f"
+          mkdir -p ../android/app/src/main/jniLibs/arm64-v8a
+          go build -trimpath -ldflags="-s -w" \
+            -o ../android/app/src/main/jniLibs/arm64-v8a/libgma.so .
+          ls -la ../android/app/src/main/jniLibs/arm64-v8a/libgma.so
 
       - name: 装 JDK 17
         uses: actions/setup-java@v4
@@ -73,3 +87,4 @@ jobs:
           path: build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
           retention-days: 14
+

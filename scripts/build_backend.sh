@@ -2,6 +2,11 @@
 # 把 server/ 目录下的 go-music-api 后端交叉编译成 android/arm64 二进制，
 # 伪装成 libgma.so 放进 jniLibs，供 App 启动时用 Process.start 拉起。
 #
+# 注意：CI(.github/workflows/build-apk.yml) 打包时会自己重新编译一份最新的，
+# 不依赖这里生成/提交进仓库的文件。这个脚本是给本地不想等 CI、或者想在没
+# 网的环境里离线验证 server/ 改动能不能编过用的，跑完记得把生成的
+# libgma.so 一并 commit 一下，保持仓库里那份不要太旧。
+#
 # 用法: ./scripts/build_backend.sh
 # 前提: 本机装了 Go 1.25+ (或者按 server/go.mod 里声明的最低版本)，
 #       且能正常访问 proxy.golang.org / GitHub (普通开发机默认就行，

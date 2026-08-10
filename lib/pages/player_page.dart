@@ -91,7 +91,7 @@ class _PlayerPageState extends State<PlayerPage> {
                   ? Image.network(
                       _current.cover,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => const Icon(Icons.music_note, size: 72),
+                      errorBuilder: (_, _, _) => const Icon(Icons.music_note, size: 72),
                     )
                   : const Icon(Icons.music_note, size: 72),
             ),

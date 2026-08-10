@@ -15,6 +15,7 @@ class _HomePageState extends State<HomePage> {
   final _controller = TextEditingController();
   List<Song> _results = const [];
   bool _loading = false;
+  bool _hasSearched = false;
   String? _error;
 
   Future<void> _doSearch() async {
@@ -28,9 +29,15 @@ class _HomePageState extends State<HomePage> {
       final songs = await ApiClient.instance.search(keyword);
       setState(() => _results = songs);
     } catch (e) {
-      setState(() => _error = '$e');
+      setState(() {
+        _error = '$e';
+        _results = const [];
+      });
     } finally {
-      setState(() => _loading = false);
+      setState(() {
+        _loading = false;
+        _hasSearched = true;
+      });
     }
   }
 
@@ -75,7 +82,11 @@ class _HomePageState extends State<HomePage> {
             child: _results.isEmpty
                 ? Center(
                     child: Text(
-                      _loading ? '搜索中…' : '搜点什么听听吧',
+                      _loading
+                          ? '搜索中…'
+                          : (_hasSearched
+                              ? (_error == null ? '没搜到相关结果，换个关键词试试' : '搜索出错了，看看上面的错误信息')
+                              : '搜点什么听听吧'),
                       style: Theme.of(context).textTheme.bodyMedium,
                     ),
                   )

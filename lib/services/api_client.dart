@@ -19,13 +19,26 @@ class ApiClient {
       queryParameters: {'q': keyword, 'type': 'song'},
     );
     final resp = await http.get(uri).timeout(const Duration(seconds: 20));
-    if (resp.statusCode != 200) {
-      throw Exception('搜索失败: HTTP ${resp.statusCode}');
+
+    // 后端对于"链接解析失败"这类业务错误，是直接把 HTTP 状态码也设成跟
+    // Response.Code 一样的值(比如 500)，但响应体里其实还是带着真正有用的
+    // 中文错误原因(msg 字段)。之前这里状态码一非 200 就直接抛
+    // "HTTP 500"，把这个信息给丢了，现在改成不管状态码是啥，先尝试解析
+    // body 拿 msg，拿不到才退回到干巴巴的 HTTP 状态码。
+    Map<String, dynamic>? body;
+    try {
+      body = jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
+    } catch (_) {
+      body = null;
     }
-    final body = jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
-    if (body['code'] != 200) {
-      throw Exception(body['msg']?.toString() ?? '搜索失败');
+
+    if (resp.statusCode != 200 || body == null || body['code'] != 200) {
+      final msg = body?['msg']?.toString();
+      throw Exception(
+        (msg != null && msg.isNotEmpty) ? msg : '搜索失败: HTTP ${resp.statusCode}',
+      );
     }
+
     final data = body['data'] as Map<String, dynamic>? ?? const {};
     final songsJson = data['songs'] as List<dynamic>? ?? const [];
     return songsJson

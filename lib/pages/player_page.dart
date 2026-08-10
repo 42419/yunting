@@ -33,12 +33,15 @@ class _PlayerPageState extends State<PlayerPage> {
   }
 
   Future<void> _playCurrent() async {
+    if (!mounted) return;
     setState(() => _error = null);
     try {
       final uri = ApiClient.instance.streamUrl(_current);
       await _player.setUrl(uri.toString());
+      if (!mounted) return;
       await _player.play();
     } catch (e) {
+      if (!mounted) return;
       setState(() => _error = '播放失败: $e');
     }
   }

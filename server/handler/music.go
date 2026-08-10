@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"sort"
@@ -343,6 +344,8 @@ func UnifiedSearch(c *gin.Context) {
 				allSongs = append(allSongs, *song)
 				searchType = "song"
 				parsed = true
+			} else {
+				log.Printf("[search] 单曲解析失败 source=%s link=%s err=%v", src, keyword, err)
 			}
 		}
 		if !parsed {
@@ -355,6 +358,8 @@ func UnifiedSearch(c *gin.Context) {
 						searchType = "song"
 					}
 					parsed = true
+				} else {
+					log.Printf("[search] 歌单解析失败 source=%s link=%s err=%v", src, keyword, err)
 				}
 			}
 		}
@@ -368,6 +373,8 @@ func UnifiedSearch(c *gin.Context) {
 						searchType = "song"
 					}
 					parsed = true
+				} else {
+					log.Printf("[search] 专辑解析失败 source=%s link=%s err=%v", src, keyword, err)
 				}
 			}
 		}
@@ -391,6 +398,8 @@ func UnifiedSearch(c *gin.Context) {
 							mu.Lock()
 							allAlbums = append(allAlbums, res...)
 							mu.Unlock()
+						} else {
+							log.Printf("[search] 专辑搜索失败 source=%s keyword=%s err=%v", s, keyword, err)
 						}
 					}
 				} else if searchType == "playlist" {
@@ -402,6 +411,8 @@ func UnifiedSearch(c *gin.Context) {
 							mu.Lock()
 							allPlaylists = append(allPlaylists, res...)
 							mu.Unlock()
+						} else {
+							log.Printf("[search] 歌单搜索失败 source=%s keyword=%s err=%v", s, keyword, err)
 						}
 					}
 				} else {
@@ -413,6 +424,8 @@ func UnifiedSearch(c *gin.Context) {
 							mu.Lock()
 							allSongs = append(allSongs, res...)
 							mu.Unlock()
+						} else {
+							log.Printf("[search] 单曲搜索失败 source=%s keyword=%s err=%v", s, keyword, err)
 						}
 					}
 				}

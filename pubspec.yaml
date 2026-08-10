@@ -33,7 +33,14 @@ dependencies:
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
-  cupertino_icons: ^1.0.8
+  cupertino_icons: ^1.0.9
+
+  # 请求内嵌后端的 REST 接口
+  http: ^1.6.0
+  # 播放 /api/v1/music/stream 返回的音频流(支持 Range，可直接边下边播)
+  just_audio: ^0.10.6
+  # 找一个 App 私有的可写目录，作为内嵌后端进程的工作目录(cookies.json 等落地用)
+  path_provider: ^2.1.6
 
   # 请求内嵌后端的 REST 接口
   http: ^1.2.2

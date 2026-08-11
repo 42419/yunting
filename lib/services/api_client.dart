@@ -14,9 +14,15 @@ class ApiClient {
   static const _base = BackendLauncher.baseUrl;
 
   /// 综合搜索：既支持关键字搜索，也支持直接粘贴各平台歌曲/歌单/专辑链接解析。
-  Future<List<Song>> search(String keyword) async {
+  /// sources 为空时用后端默认的那一批平台；非空时只搜指定的平台(对应电台
+  /// 预设 chip 选中的那几个)。
+  Future<List<Song>> search(String keyword, {List<String> sources = const []}) async {
     final uri = Uri.parse('$_base/api/v1/music/search').replace(
-      queryParameters: {'q': keyword, 'type': 'song'},
+      queryParameters: {
+        'q': keyword,
+        'type': 'song',
+        if (sources.isNotEmpty) 'sources': sources,
+      },
     );
     final resp = await http.get(uri).timeout(const Duration(seconds: 20));
 

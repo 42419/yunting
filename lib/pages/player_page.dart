@@ -1,73 +1,112 @@
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
 
-import '../models/song.dart';
-import '../services/api_client.dart';
+import '../services/playback_controller.dart';
+import '../theme/app_theme.dart';
+import '../widgets/song_cover.dart';
 
-class PlayerPage extends StatefulWidget {
-  const PlayerPage({super.key, required this.queue, required this.initialIndex});
-
-  final List<Song> queue;
-  final int initialIndex;
+/// 完整播放页，从首页的迷你播放条或者搜索结果点进来。播放状态全部来自
+/// PlaybackController 这个全局单例，这一页本身不持有任何播放器实例，
+/// 单纯是个"展开视图"，退出这一页音乐照常播。
+class PlayerPage extends StatelessWidget {
+  const PlayerPage({super.key});
 
   @override
-  State<PlayerPage> createState() => _PlayerPageState();
+  Widget build(BuildContext context) {
+    final controller = PlaybackController.instance;
+
+    return Scaffold(
+      backgroundColor: AppColors.bg,
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 30),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: const Text('正在播放'),
+      ),
+      body: AnimatedBuilder(
+        animation: controller,
+        builder: (context, _) {
+          final song = controller.current;
+          if (song == null) {
+            return const Center(
+              child: Text('还没有播放任何歌曲', style: TextStyle(color: AppColors.textSecondary)),
+            );
+          }
+
+          return SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(28, 8, 28, 20),
+              child: Column(
+                children: [
+                  const Spacer(),
+                  _GlowingCover(url: song.cover),
+                  const SizedBox(height: 32),
+                  Text(
+                    song.name,
+                    style: Theme.of(context).textTheme.headlineSmall,
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    '${song.artist} · ${song.source}',
+                    style: Theme.of(context).textTheme.bodySmall,
+                    textAlign: TextAlign.center,
+                  ),
+                  if (controller.error != null) ...[
+                    const SizedBox(height: 14),
+                    Text(
+                      controller.error!,
+                      style: const TextStyle(color: AppColors.error, fontSize: 13),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                  const Spacer(),
+                  _ProgressBar(player: controller.player),
+                  const SizedBox(height: 8),
+                  _Controls(controller: controller),
+                  const SizedBox(height: 8),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
 }
 
-class _PlayerPageState extends State<PlayerPage> {
-  final _player = AudioPlayer();
-  late int _index = widget.initialIndex;
-  String? _error;
+class _GlowingCover extends StatelessWidget {
+  const _GlowingCover({required this.url});
 
-  Song get _current => widget.queue[_index];
+  final String url;
 
   @override
-  void initState() {
-    super.initState();
-    _playCurrent();
-    _player.playerStateStream.listen((state) {
-      if (state.processingState == ProcessingState.completed) {
-        _playNext();
-      }
-    });
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.amber.withValues(alpha: 0.12),
+            blurRadius: 48,
+            spreadRadius: 4,
+          ),
+        ],
+      ),
+      child: SongCover(url: url, size: 260, radius: 20),
+    );
   }
+}
 
-  Future<void> _playCurrent() async {
-    if (!mounted) return;
-    setState(() => _error = null);
-    try {
-      final uri = ApiClient.instance.streamUrl(_current);
-      await _player.setUrl(uri.toString());
-      if (!mounted) return;
-      await _player.play();
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _error = '播放失败: $e');
-    }
-  }
+class _ProgressBar extends StatelessWidget {
+  const _ProgressBar({required this.player});
 
-  void _playNext() {
-    if (_index < widget.queue.length - 1) {
-      setState(() => _index++);
-      _playCurrent();
-    }
-  }
+  final AudioPlayer player;
 
-  void _playPrev() {
-    if (_index > 0) {
-      setState(() => _index--);
-      _playCurrent();
-    }
-  }
-
-  @override
-  void dispose() {
-    _player.dispose();
-    super.dispose();
-  }
-
-  String _fmt(Duration? d) {
-    if (d == null) return '00:00';
+  String _fmt(Duration d) {
     final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
     final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
     return '$m:$s';
@@ -75,108 +114,93 @@ class _PlayerPageState extends State<PlayerPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('正在播放')),
-      body: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+    return StreamBuilder<Duration>(
+      stream: player.positionStream,
+      builder: (context, snapshot) {
+        final position = snapshot.data ?? Duration.zero;
+        final total = player.duration ?? Duration.zero;
+        final max = total.inMilliseconds > 0 ? total.inMilliseconds.toDouble() : 1.0;
+        final value = position.inMilliseconds.clamp(0, max.toInt()).toDouble();
+        return Column(
           children: [
-            Container(
-              width: 220,
-              height: 220,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
-                color: Theme.of(context).colorScheme.secondaryContainer,
+            SliderTheme(
+              data: SliderTheme.of(context).copyWith(
+                trackHeight: 3,
+                thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
               ),
-              clipBehavior: Clip.antiAlias,
-              child: _current.cover.isNotEmpty
-                  ? Image.network(
-                      _current.cover,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, _, _) => const Icon(Icons.music_note, size: 72),
-                    )
-                  : const Icon(Icons.music_note, size: 72),
+              child: Slider(
+                value: value,
+                max: max,
+                onChanged: (v) => player.seek(Duration(milliseconds: v.toInt())),
+              ),
             ),
-            const SizedBox(height: 24),
-            Text(
-              _current.name,
-              style: Theme.of(context).textTheme.titleLarge,
-              textAlign: TextAlign.center,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              '${_current.artist} · ${_current.source}',
-              style: Theme.of(context).textTheme.bodyMedium,
-              textAlign: TextAlign.center,
-            ),
-            if (_error != null) ...[
-              const SizedBox(height: 12),
-              Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
-            ],
-            const SizedBox(height: 24),
-            StreamBuilder<Duration>(
-              stream: _player.positionStream,
-              builder: (context, snapshot) {
-                final position = snapshot.data ?? Duration.zero;
-                final total = _player.duration ?? Duration.zero;
-                final max = total.inMilliseconds > 0 ? total.inMilliseconds.toDouble() : 1.0;
-                final value = position.inMilliseconds.clamp(0, max.toInt()).toDouble();
-                return Column(
-                  children: [
-                    Slider(
-                      value: value,
-                      max: max,
-                      onChanged: (v) => _player.seek(Duration(milliseconds: v.toInt())),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(_fmt(position)),
-                          Text(_fmt(_player.duration)),
-                        ],
-                      ),
-                    ),
-                  ],
-                );
-              },
-            ),
-            const SizedBox(height: 12),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                IconButton(
-                  iconSize: 36,
-                  onPressed: _index > 0 ? _playPrev : null,
-                  icon: const Icon(Icons.skip_previous),
-                ),
-                const SizedBox(width: 16),
-                StreamBuilder<PlayerState>(
-                  stream: _player.playerStateStream,
-                  builder: (context, snapshot) {
-                    final playing = snapshot.data?.playing ?? false;
-                    return IconButton(
-                      iconSize: 56,
-                      onPressed: () => playing ? _player.pause() : _player.play(),
-                      icon: Icon(playing ? Icons.pause_circle_filled : Icons.play_circle_filled),
-                    );
-                  },
-                ),
-                const SizedBox(width: 16),
-                IconButton(
-                  iconSize: 36,
-                  onPressed: _index < widget.queue.length - 1 ? _playNext : null,
-                  icon: const Icon(Icons.skip_next),
-                ),
-              ],
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(_fmt(position), style: Theme.of(context).textTheme.bodySmall),
+                  Text(_fmt(total), style: Theme.of(context).textTheme.bodySmall),
+                ],
+              ),
             ),
           ],
+        );
+      },
+    );
+  }
+}
+
+class _Controls extends StatelessWidget {
+  const _Controls({required this.controller});
+
+  final PlaybackController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        IconButton(
+          iconSize: 34,
+          color: controller.hasPrevious ? AppColors.textPrimary : AppColors.textFaint,
+          onPressed: controller.hasPrevious ? controller.playPrevious : null,
+          icon: const Icon(Icons.skip_previous_rounded),
         ),
-      ),
+        const SizedBox(width: 20),
+        StreamBuilder<PlayerState>(
+          stream: controller.player.playerStateStream,
+          builder: (context, snapshot) {
+            final playing = snapshot.data?.playing ?? false;
+            final busy = controller.loading ||
+                snapshot.data?.processingState == ProcessingState.loading ||
+                snapshot.data?.processingState == ProcessingState.buffering;
+            return Container(
+              width: 68,
+              height: 68,
+              decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.amber),
+              child: busy
+                  ? const Padding(
+                      padding: EdgeInsets.all(20),
+                      child: CircularProgressIndicator(strokeWidth: 2.6, color: AppColors.bg),
+                    )
+                  : IconButton(
+                      iconSize: 36,
+                      color: AppColors.bg,
+                      onPressed: controller.togglePlayPause,
+                      icon: Icon(playing ? Icons.pause_rounded : Icons.play_arrow_rounded),
+                    ),
+            );
+          },
+        ),
+        const SizedBox(width: 20),
+        IconButton(
+          iconSize: 34,
+          color: controller.hasNext ? AppColors.textPrimary : AppColors.textFaint,
+          onPressed: controller.hasNext ? controller.playNext : null,
+          icon: const Icon(Icons.skip_next_rounded),
+        ),
+      ],
     );
   }
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'pages/home_page.dart';
 import 'services/backend_launcher.dart';
+import 'theme/app_theme.dart';
 
 void main() {
   runApp(const MyApp());
@@ -14,7 +15,10 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: '云听',
-      theme: ThemeData(colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple)),
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.dark,
+      darkTheme: AppTheme.dark,
+      themeMode: ThemeMode.dark,
       home: const StartupPage(),
     );
   }
@@ -72,6 +76,7 @@ class _StartupPageState extends State<StartupPage> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.bg,
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
@@ -79,15 +84,35 @@ class _StartupPageState extends State<StartupPage> with WidgetsBindingObserver {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               if (_error == null) ...[
-                const CircularProgressIndicator(),
+                Container(
+                  width: 64,
+                  height: 64,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: AppColors.amberDim, width: 1.4),
+                  ),
+                  alignment: Alignment.center,
+                  child: const Icon(Icons.radio_rounded, color: AppColors.amber, size: 28),
+                ),
+                const SizedBox(height: 20),
+                const SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(strokeWidth: 2.4, color: AppColors.amber),
+                ),
                 const SizedBox(height: 16),
-                Text(_status),
+                Text(_status, style: const TextStyle(color: AppColors.textSecondary)),
               ] else ...[
-                Icon(Icons.error_outline, color: Theme.of(context).colorScheme.error, size: 40),
+                const Icon(Icons.error_outline_rounded, color: AppColors.error, size: 40),
                 const SizedBox(height: 16),
-                Text(_error!, textAlign: TextAlign.center),
+                Text(
+                  _error!,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: AppColors.textSecondary),
+                ),
                 const SizedBox(height: 16),
                 FilledButton(
+                  style: FilledButton.styleFrom(backgroundColor: AppColors.amber, foregroundColor: AppColors.bg),
                   onPressed: () {
                     setState(() {
                       _error = null;
